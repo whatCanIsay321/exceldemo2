@@ -1,0 +1,77 @@
+import asyncio
+from contextlib import asynccontextmanager
+from pydantic import BaseModel
+import time
+import json
+import aiofiles
+from fastapi import FastAPI, Depends,Request
+import uvicorn
+from modelscope import AutoModelForCausalLM, AutoTokenizer
+from datetime import datetime
+from src.llm_singleton import OpenAIClientSingleton
+from src.get_excel import get_excel_data
+from src.extract_graph import BuildGraph
+from src.my_logger import logger
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    app.state.graph = BuildGraph().get_graph()
+    logger.info("graph start")
+    yield
+    await OpenAIClientSingleton().close()
+    logger.info("openai_client disconnect,app finished")
+
+
+
+app = FastAPI(lifespan=lifespan)
+
+def get_graph():
+    return app.state.graph
+
+class Item(BaseModel):
+    url: str
+
+@app.post("/items/")
+async def create_item(item: Item,graph=Depends(get_graph)):
+    url = item.url
+    flag,excels =await get_excel_data(url)
+    tasks=[]
+    if flag==False:
+        return {"error":"获取excel出错"},404
+    else:
+        for excel in excels:
+            task = asyncio.create_task(graph.ainvoke({
+                "type_window": 11000,
+                "llm_window": 7000,
+                "excel_df":excel,
+                "excel_dict": None,
+                "excel_type": None,
+                "flag":"",
+                "type_one_head":None,
+                "type_one_index":None,
+                'type_two_exe_prompts': None,
+                'chunks':  None,
+                'result':  None,
+                "error":None}))
+            tasks.append(task)
+        reuslt = await asyncio.gather(*tasks)
+        parse=[]
+        output_filename = "merged_output.json"
+        for index,item in enumerate(reuslt):
+            if item["error"]==None:
+                parse.extend(item["result"])
+                logger.info(f"{url}-第{index+1}张表-被分为{item["excel_type"]}类，通过{item["flag"]}提取出{len(item["result"])}")
+            else:
+                logger.error(f"{url}-第{index+1}张表-被分为{item["excel_type"]}类，通过{item["flag"]}提取失败。失败原因{item["error"]}")
+        async with aiofiles.open(output_filename, 'w', encoding="utf-8") as f:
+            # 将list数据转换为JSON并写入文件
+            await f.write(json.dumps(parse, ensure_ascii=False, indent=4))
+        return {"parse":parse}
+
+
+
+
+
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

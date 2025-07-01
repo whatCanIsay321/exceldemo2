@@ -1,0 +1,67 @@
+[
+    {
+        "start_time": "202412",
+        "end_time": "202412",
+        "total_electricity": 3602,
+        "grid_electricity": 3602,
+        "payable_fee": 1416.31,
+        "payable_tax": 162.94,
+        "grid_price": 0.3932,
+        "power_station": "鹤塘镇供电所",
+        "generation_account": 3550002017241,
+        "transaction_id": null,
+        "meter_id": null
+    },
+    {
+        "start_time": "202412",
+        "end_time": "202412",
+        "total_electricity": 4208,
+        "grid_electricity": 4208,
+        "payable_fee": 1654.59,
+        "payable_tax": 190.35,
+        "grid_price": 0.3932,
+        "power_station": "鹤塘镇供电所",
+        "generation_account": 3550002193797,
+        "transaction_id": null,
+        "meter_id": null
+    },
+    {
+        "start_time": "202412",
+        "end_time": "202412",
+        "total_electricity": 4021,
+        "grid_electricity": 4021,
+        "payable_fee": 1581.06,
+        "payable_tax": 181.89,
+        "grid_price": 0.3932,
+        "power_station": "鹤塘镇供电所",
+        "generation_account": 3550002193289,
+        "transaction_id": null,
+        "meter_id": null
+    },
+    {
+        "start_time": "202412",
+        "end_time": "202412",
+        "total_electricity": 5004,
+        "grid_electricity": 5004,
+        "payable_fee": 1967.57,
+        "payable_tax": 226.36,
+        "grid_price": 0.3932,
+        "power_station": "鹤塘镇供电所",
+        "generation_account": 3550002030722,
+        "transaction_id": null,
+        "meter_id": null
+    },
+    {
+        "start_time": "202412",
+        "end_time": "202412",
+        "total_electricity": 10148,
+        "grid_electricity": 10148,
+        "payable_fee": 3990.19,
+        "payable_tax": 459.05,
+        "grid_price": 0.3932,
+        "power_station": "鹤塘镇供电所",
+        "generation_account": 3550002198206,
+        "transaction_id": null,
+        "meter_id": null
+    }
+]
