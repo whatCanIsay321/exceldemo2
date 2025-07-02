@@ -5,7 +5,7 @@ from typing import Literal
 from sys import exception
 from typing import Annotated
 from pydantic import BaseModel, Field
-from src.utils import count_token, extract_json,get_window,get_type_two_window,get_parse_window,extract_json_list
+from src.utils import  extract_json,get_window,get_type_two_window,get_parse_window,extract_json_list,build_messages
 from langgraph.graph import StateGraph, MessagesState, START, END
 from typing import TypedDict, Any
 from langgraph.types import Command
@@ -14,6 +14,8 @@ from src.token_singleton import TokenizerSingleton
 from src.config import Config
 import pandas as pd
 import aiofiles
+from src.extract_item import item
+from src.prompt_manager import PromptManager
 import openpyxl
 from modelscope import AutoModelForCausalLM, AutoTokenizer
 
@@ -23,6 +25,7 @@ class State(TypedDict):
 
     excel_df:Any
     excel_dict:Any
+    excel_list:Any
     excel_type: dict | None
     flag :str
 
@@ -39,57 +42,77 @@ class State(TypedDict):
 
 class PreProcessNode:
     def __call__(self, state: State):
-        df = state["excel_df"]
-        df.dropna(how="all", inplace=True)
-        df.dropna(axis=1, how="all", inplace=True)
-        df.reset_index(drop=True, inplace=True)
+        df = state["excel_df"].dropna(how="all").dropna(axis=1, how="all").reset_index(drop=True)
         excel_dict = json.loads(df.to_json(force_ascii=False, orient="index"))
         clean_dict = {}
         for key, value in excel_dict.items():
             d_clean = {k: v for k, v in value.items() if v is not None}
             clean_dict[key] = d_clean
-        excel_list = list(excel_dict.items())
-        return Command(update={"excel_dict": clean_dict,"excel_list":excel_list}, goto="FineTypeBot")
+        excel_list = list(clean_dict.items())
+        return Command(update={"excel_df":df,"excel_dict": clean_dict,"excel_list":excel_list}, goto="FineTypeBot")
 
 class FineTypeNode:
-    def __init__(self, system_prompt):
-        self.system_prompt = system_prompt
+    def __init__(self, type_system_prompt,count_system_prompt,final_system_prompt):
+        self.type_system_prompt = type_system_prompt
+        self.count_system_prompt = count_system_prompt
+        self.final_system_prompt=final_system_prompt
 
     async def __call__(self, state: State):
         llm_window = state["llm_window"]
-        type_window =  state["type_window"]
-        excel_dict = state["excel_dict"]
-        user_prompt = f"Json格式的Excel表格输入:"
-        flag,message = get_window(excel_dict,type_window,self.system_prompt,user_prompt)
+        excel_list = state["excel_list"]
+        user_prompt = f"Json格式的Excel表格："
+        type_flag,type_messages = get_window(excel_list,llm_window,self.type_system_prompt,user_prompt)
+        count_flag,count_messages = get_window(excel_list,llm_window,self.count_system_prompt,user_prompt)
 
         try:
-            response =await OpenAIClientSingleton().create_completion(messages=message)
+            type_response =await OpenAIClientSingleton().create_completion(messages=type_messages)
+            type_result = type_response.choices[0].message.content
+            type_result_json = extract_json(type_result)
+            type_result_type = int(type_result_json["type"])
 
-            result = response.choices[0].message.content
-            token_num = response.usage.prompt_tokens
-            result_json = extract_json(result)
+            count_response = await OpenAIClientSingleton().create_completion(messages=count_messages)
+            count_result = count_response.choices[0].message.content
+            count_result_json = extract_json(count_result)
+            count_result_count = int(count_result_json["count"])
 
-            if result_json["type"] == 1 :
-                return Command(update={"excel_type": result_json}, goto="TypeOneGetHeadBot")
-            elif result_json["type"] == 2 and token_num>=llm_window:
-                return Command(update={"excel_type": result_json,"flag":"通过切片"}, goto="TypeTwoGetChunksBot")
-            elif result_json["type"] == 2 and token_num<llm_window:
-                return Command(update={"excel_type": result_json,"flag":"直接送入模型"}, goto="OnlyllmBot")
+            final_messages = build_messages(self.final_system_prompt,user_prompt,dict(excel_list))
+            token_num = TokenizerSingleton().get_token_num(final_messages)
+
+            if result_type == 1:
+                if token_num > llm_window:
+                    return Command(update={"excel_type": type_result_type, "flag": "通过函数"},
+                                   goto="TypeOneGetHeadBot")
+                else:
+                    if count_result_count>10:
+                        return Command(update={"excel_type": type_result_type, "flag": "通过函数"},
+                                       goto="TypeOneGetHeadBot")
+                    else:
+                        return Command(update={"excel_type": type_result_type, "flag": "直接送入模型"},
+                                       goto="OnlyllmBot")
+            else:
+                if token_num > llm_window:
+                    return Command(update={"excel_type": type_result_type, "flag": "通过切片"},
+                                   goto="TypeTwoGetChunksBot")
+                else:
+                    return Command(update={"excel_type": type_result_type, "flag": "直接送入模型"}, goto="OnlyllmBot")
+
         except Exception as e:
             exception_message = str(e)
             return Command(update={"error": f"FineTypeNode出错：{exception_message}"}, goto=END)
+
 class TypeOneGetHeadNode:
     def __init__(self, system_prompt):
         self.system_prompt = system_prompt
 
     async def __call__(self, state: State):
-        llm_window = state["llm_window"]
         head_index = 30
-        excel_dict=dict(list(state["excel_dict"].items())[:head_index])
-        user_prompt = "json格式的excel文件:"
-        flag, message = get_window(excel_dict, llm_window, self.system_prompt, user_prompt)
+        llm_window = state["llm_window"]
+        excel_list = state["excel_list"]
+        excel_dict=dict(excel_list[:head_index])
+        user_prompt = "JSON格式的Excel表格："
+        flag, messages = get_window(excel_dict, llm_window, self.system_prompt, user_prompt)
         try:
-            response =await OpenAIClientSingleton().create_completion(messages=message)
+            response =await OpenAIClientSingleton().create_completion(messages=messages)
             result = response.choices[0].message.content
             result_json = extract_json(result)
             return Command(update={"type_one_head": result_json}, goto="TypeOneGetIndexBot")
@@ -101,10 +124,11 @@ class TypeOneGetIndexNode:
         self.system_prompt = system_prompt
 
     async def __call__(self, state: State):
-        llm_window = state["llm_window"]
         head_index = 30
-        excel_dict = dict(list(state["excel_dict"].items())[:head_index])
-        user_prompt = "json格式的excel文件:"
+        llm_window = state["llm_window"]
+        excel_list = state["excel_list"]
+        excel_dict = dict(excel_list[:head_index])
+        user_prompt = "JSON格式的Excel表格："
         flag, message = get_window(excel_dict, llm_window, self.system_prompt, user_prompt)
         try:
             response = await OpenAIClientSingleton().create_completion(messages=message)
@@ -120,12 +144,11 @@ class TypeOneGetCommonNode:
 
     async def __call__(self, state: State):
         llm_window = state["llm_window"]
-        head_index=state["type_one_head"]["index"]
-        excel_dict = dict(list(state["excel_dict"].items())[:head_index+1])
-        user_prompt = f"json格式的excel表头:{excel_dict}"
-        message = [
-            {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": user_prompt}]
+        excel_list = state["excel_list"]
+        head_index=int(state["type_one_head"]["index"])
+        excel_dict = dict(excel_list[:head_index+1])
+        user_prompt = "JSON格式的Excel表格："
+        flag, message = get_window(excel_dict, llm_window, self.system_prompt, user_prompt)
         try:
             response = await OpenAIClientSingleton().create_completion(messages=message)
             result = response.choices[0].message.content
@@ -134,16 +157,15 @@ class TypeOneGetCommonNode:
         except Exception as e:
             exception_message = str(e)
             return Command(update={"error": f"TypeOneGetCommonNode出错：{exception_message}"}, goto=END)
+
+
 class TypeOneExeNode:
      async def __call__(self, state: State):
-         # async with aiofiles.open(output_filename, 'w', encoding='utf-8') as json_file:
-         #     # 使用异步json.dumps
-         #     await json_file.write(jsonsr)
          count=0
          result=[]
          index = state["type_one_index"]
-         extra = state["type_one_common"]
-         start_row = state["type_one_head"]["index"]
+         common = state["type_one_common"]
+         start_row = int(state["type_one_head"]["index"])
          excel_list = list(state["excel_dict"].values())[start_row+1:]
          try:
              for i,data in enumerate(excel_list):
@@ -151,7 +173,7 @@ class TypeOneExeNode:
                      key: data.get(str(value)) if value is not None else None
                      for key, value in index.items()
                  }
-                 temp = self.merge_dicts(temp,extra)
+                 temp = self.merge_dicts(temp,common)
                  if temp["generation_account"]!=None or temp["transaction_id"]!=None:
                     if i ==0:
                         count=self.count_non_empty_fields(temp)
@@ -161,9 +183,6 @@ class TypeOneExeNode:
                             result.append(temp)
                         else:
                             continue
-
-             # with open(output_filename, 'w', encoding='utf-8') as json_file:
-             #     json.dump(result, json_file, ensure_ascii=False, indent=4)
              return Command(update={"result":result},goto=END)
          except Exception as e:
                 exception_message = str(e)
@@ -227,18 +246,17 @@ class TypeTwoGetChunksNode:
         next_start_index = 0
         stop = False
         chunks=[]
-        excel_dict = state["excel_dict"]
-        dict_len=len(state["excel_dict"])
-        user_prompt=  f" Json 格式的 Excel 表格:"
+        excel_list = state["excel_list"]
+        user_prompt=  f"Json格式的Excel表格："
         while stop==False:
-            stop,message,start_index,next_start_index = get_type_two_window(excel_dict,llm_window,start_index,self.system_prompt,user_prompt)
+            stop,messages,start_index,next_start_index = get_type_two_window(excel_list,llm_window,start_index,self.system_prompt,user_prompt)
             if stop:
                 chunk = [start_index, next_start_index - 1]
                 chunks.append(chunk)
                 print(f"加载了{chunk}")
             else:
                 try:
-                    response = await OpenAIClientSingleton().create_completion(messages=message)
+                    response = await OpenAIClientSingleton().create_completion(messages=messages)
                     result = response.choices[0].message.content
                     result_json = extract_json(result)
                     #在指定模型上下文长度之内，主要excel块和额外excel块
@@ -274,10 +292,10 @@ class TypeTwoGetPromptsNode:
 
     def __call__(self, state: State):
         llm_window = state["llm_window"]
-        excel_dict = state["excel_dict"]
+        excel_list = state["excel_list"]
         chunks =state["chunks"]
-        user_prompt = f"'json格式的excel文件:"
-        result = get_parse_window(chunks,excel_dict,llm_window,self.system_prompt,user_prompt)
+        user_prompt = f"'Json格式的Excel表格："
+        result = get_parse_window(chunks,excel_list,llm_window,self.system_prompt,user_prompt)
         return Command(update={"type_two_exe_prompts": result}, goto="TypeTwoExeBot")
 
 class TypeTwoExeNode():
@@ -285,8 +303,8 @@ class TypeTwoExeNode():
         json_list=[]
         type_two_exe_prompt=state["type_two_exe_prompts"]
         try:
-            for message in type_two_exe_prompt:
-                response =await OpenAIClientSingleton().create_completion(messages=message[1])
+            for messages in type_two_exe_prompt:
+                response =await OpenAIClientSingleton().create_completion(messages=messages[1])
                 result = response.choices[0].message.content
                 result_json = extract_json_list(result)
                 json_list.extend(result_json)
@@ -308,13 +326,11 @@ class OnlyllmNode:
     def __init__(self, system_prompt):
         self.system_prompt = system_prompt
     async def __call__(self, state: State):
-
-        human_input = f"请从我提供的 JSON 格式的 Excel 表格中，准确识别并提取所有合法的电费结算单记录，输出格式必须为一个 JSON 数组。JSON输入:{state["excel_dict"]}/no_think。"
-        message = [
-            {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": human_input}]
+        excel_dict=state["excel_dict"]
+        user_prompt = f"Json格式的Excel表格："
+        messages = build_messages(self.system_prompt, user_prompt,excel_dict)
         try:
-            response =await OpenAIClientSingleton().create_completion(messages=message)
+            response =await OpenAIClientSingleton().create_completion(messages=messages)
             result = response.choices[0].message.content
             result_json = extract_json_list(result)
 
@@ -333,38 +349,35 @@ class BuildGraph:
         config  = Config()
         graph_builder = StateGraph(State)
         PreProcessBot = PreProcessNode()
-
-        FineTypeBot = FineTypeNode(config.type_system)
-        TypeOneGetHeadBot = TypeOneGetHeadNode(config.get_head_system)
-        TypeOneGetIndexBot = TypeOneGetIndexNode(config.get_index_system)
-        TypeOneGetCommonBot = TypeOneGetCommonNode(config.get_head_common_system)
+        ##################
+        FineTypeBot = FineTypeNode(PromptManager().get("type_system"),PromptManager().get("count_items_system"),PromptManager().get("prompt"))
+        TypeOneGetHeadBot = TypeOneGetHeadNode(PromptManager().get("get_head_system"))
+        TypeOneGetIndexBot = TypeOneGetIndexNode(PromptManager().get("get_index_system"))
+        TypeOneGetCommonBot = TypeOneGetCommonNode(PromptManager().get("get_head_common_system"))
         TypeOneExeBot = TypeOneExeNode()
-
-
-
-        TypeTwoGetChunksBot =TypeTwoGetChunksNode(config.depart_system)
-        TypeTwoGetPromptsBot=TypeTwoGetPromptsNode(config.prompt)
+        ##################
+        TypeTwoGetChunksBot =TypeTwoGetChunksNode(PromptManager().get("depart_system"))
+        TypeTwoGetPromptsBot=TypeTwoGetPromptsNode(PromptManager().get("prompt"))
         TypeTwoExeBot = TypeTwoExeNode()
+        ##################
+        OnlyllmBot = OnlyllmNode(PromptManager().get("prompt"))
+        ##################
 
-        OnlyllmBot = OnlyllmNode(config.prompt)
 
+        ##################
         graph_builder.add_node("PreProcessBot", PreProcessBot)
         graph_builder.add_node("FineTypeBot", FineTypeBot)
-
-
         graph_builder.add_node("TypeOneGetHeadBot", TypeOneGetHeadBot)
         graph_builder.add_node("TypeOneGetIndexBot", TypeOneGetIndexBot)
         graph_builder.add_node("TypeOneGetCommonBot", TypeOneGetCommonBot)
         graph_builder.add_node("TypeOneExeBot", TypeOneExeBot)
-
         graph_builder.add_node("TypeTwoGetChunksBot",TypeTwoGetChunksBot)
         graph_builder.add_node("TypeTwoGetPromptsBot", TypeTwoGetPromptsBot)
         graph_builder.add_node("TypeTwoExeBot", TypeTwoExeBot)
-
         graph_builder.add_node("OnlyllmBot", OnlyllmBot)
-
-
         graph_builder.add_edge(START, "PreProcessBot")
+        ##################
+
         graph = graph_builder.compile()
         return graph
 
@@ -374,16 +387,25 @@ class BuildGraph:
 
 
 if __name__ == "__main__":
-
-    excel_data = pd.read_excel("../excel/最最特殊20250102171501269.xlsx", header=None, sheet_name=None)
+    config = Config()
+    # tokenizer = TokenizerSingleton().get_tokenizer()
+    # num1 = len(tokenizer(config.depart_system)["input_ids"])
+    # num2 =len(tokenizer(config.prompt)["input_ids"])
+    render_parameters = item().render_parameters
+    for key, value in config.model_dump().items():
+        PromptManager().register_base(key,value)
+        if key in render_parameters:
+            PromptManager().render_base(key,**render_parameters.get(key))
+        else:
+            PromptManager().render_base(key)
+    excel_data = pd.read_excel("../excel/3个sheet都是有效数据？？20250106081920405.xls", header=None, sheet_name=None)
     excel_df=  [df for sheet_name, df in excel_data.items()]
-    df = excel_df[0]
+    df = excel_df[2]
     graph = BuildGraph().get_graph()
     async def get_item():
         result = await graph.ainvoke(input={
             "type_window": 11000,
-            "llm_window": 6500,
-
+            "llm_window": 6000,
             "excel_df":df,
             "excel_dict": None,
             "excel_list":None,
@@ -397,62 +419,13 @@ if __name__ == "__main__":
             'result':  None,
         })  # 调用异步函数并等待结果
         print(f"获取的结果是: {result}")
+        x = result["result"]
+
+        async with aiofiles.open("output_filename.json", 'w', encoding="utf-8") as f:
+            # 将list数据转换为JSON并写入文件
+            await f.write(json.dumps(result["result"], ensure_ascii=False, indent=4))
+
     #
     #
     # # 运行异步事件循环
     asyncio.run(get_item())  # 在 Python 3.7+ 中，使用 asyncio.run 来执行主函数
-
-    # def blocking_task(graph,n,excel):
-    #     print(f"Task {n} starting")
-    #     result = graph.invoke(input={
-    #         "excel_df": excel_df[0],
-    #         "excel_json": None,
-    #         "excel_type": None}, output_keys="result")
-    #     print(f"Task {n} finished")
-    #     return result
-    #
-    # async def compute():
-    #     wb = load_workbook('税金.xlsx', read_only=True)
-    #     excel_df=[]
-    #     for sheet in wb.sheetnames:
-    #         excel_df.append(pd.read_excel("./税金.xlsx",header=None,sheet_name=sheet))
-
-    #     executor = ThreadPoolExecutor(max_workers=5)
-    #     loop = asyncio.get_event_loop()
-    #     return {"task_id": task_id, "result": result}
-    #
-    #     print(result)
-    #
-    #     tasks = [loop.run_in_executor(executor, blocking_task, graph,index,item) for index,item in enumerate(excel_df)]
-    #     wb = load_workbook('最最特殊20250102171501269.xlsx', read_only=True)
-    #     excel_df=[]
-    #     for sheet in wb.sheetnames:
-    #         excel_df.append(pd.read_excel("./最最特殊20250102171501269.xlsx",header=None,sheet_name=sheet))
-    #     graph = BuildGraph().get_graph()
-    #     # start = time.time()
-    #     # result = graph.invoke(input={
-    #     # "excel_df": excel_df[0],
-    #     # "excel_json": None,
-    #     # "excel_type": None}, output_keys="result")
-    #     # end = time.time()
-    #     # print(len(result))
-    #     # print(end-start)
-    #     for event in graph.stream(input={
-    #         "excel_df":excel_df[0],
-    #         "excel_json": None,
-    #         "excel_type": None,
-    #         "type_one_head":None,
-    #         "type_one_index":None,
-    #         'type_two_exe_prompt': None,
-    #         'chunks':  None,
-    #         'result':  None,
-    #
-    #     }):
-    #         print("######################################")
-    #         print("对话输出:", event)
-    #         print('\n')
-
-
-        #
-
-    # compute()

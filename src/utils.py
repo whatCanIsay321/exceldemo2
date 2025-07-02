@@ -5,6 +5,7 @@ from src.token_singleton import TokenizerSingleton
 import pandas as pd
 
 def build_messages(system_prompt,user_prompt,input):
+    input = json.dumps(input, separators=(",", ":"),ensure_ascii=False,indent=1)
     return [ {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"{user_prompt}\n{input}/no_think"}]
 
@@ -39,17 +40,16 @@ def find_max_index(df,max_tokens,system_prompt,user_prompt):
 
 def get_window(excel_list,window,system_prompt,user_prompt):
     flag=False
-    dict_len = len(excel_list)
     messages = build_messages(system_prompt,user_prompt,dict(excel_list))
 
-    token_num = TokenizerSingleton().get_token_num(message)
-    if token_num<window:
+    token_num = TokenizerSingleton().get_token_num(messages)
+    if token_num<=window:
         flag = True
-        return flag,message
+        return flag,messages
     else:
         index = find_max_index(excel_list,window,system_prompt,user_prompt)
         messages = build_messages(system_prompt, user_prompt, dict(excel_list[:index]))
-        return flag,message
+        return flag,messages
 
 def get_type_two_window(excel_list,window,start_index,system_prompt,user_prompt):
     #获取当前解析到excel第几行了，对excel进行切片。
@@ -58,7 +58,7 @@ def get_type_two_window(excel_list,window,start_index,system_prompt,user_prompt)
     current_dict = dict(dict_list)
     messages = build_messages(system_prompt,user_prompt,current_dict)
     token_num = TokenizerSingleton().get_token_num(messages)
-    if token_num<window:
+    if token_num<=window:
         stop =True
         start_index = start_index
         next_start_index = dict_len+start_index
@@ -68,7 +68,7 @@ def get_type_two_window(excel_list,window,start_index,system_prompt,user_prompt)
         stop = False
         start_index=start_index
         next_start_index =index+start_index
-    return stop,message,start_index,next_start_index
+    return stop,messages,start_index,next_start_index
 
 def get_parse_window(chunks,excel_list, window, system_prompt, user_prompt):
     index = 0
@@ -91,18 +91,18 @@ def get_parse_window(chunks,excel_list, window, system_prompt, user_prompt):
         current_dict = dict(current_dict_list)
         messages = build_messages(system_prompt, user_prompt, current_dict)
         #当前工作区间对应的token数
-        token_num = TokenizerSingleton().get_token_num(message)
+        token_num = TokenizerSingleton().get_token_num(messages)
         if token_num<=window :
             #小于窗口，将切片数组索引后移一位，这是为了将下一个chunk添加在temp中来扩充提示词所涵盖的excel字典范围。
             index=index+1
             #如果切片索引超过了长度，表面当前是最后一个切片了，索引将结果直接插入
             if index >=len(dict_chunks):
-                result.append([window>token_num, message])
+                result.append([window>token_num, messages])
                 break
         else:
             #如果单个直接超窗口，直接插入，将切片数组索引后移一位。
             if(len(temp)==1):
-                result.append([False,message])
+                result.append([False,messages])
                 index=index+1
                 temp=[]
             else:
@@ -115,47 +115,7 @@ def get_parse_window(chunks,excel_list, window, system_prompt, user_prompt):
                 # 将list转为dict
                 current_dict = dict(current_dict_list)
                 messages = build_messages(system_prompt, user_prompt, current_dict)
-                result.append([True,message])
+                result.append([True,messages])
                 temp=[]
     return result
-
-
-# def remove_empty_entries(data):
-#     result = []
-#     for item in data:
-#         if item["power_station"] or item["transaction_id"] or item["meter_id"]:
-#             result.append(item)
-#     return result
-
-# df = pd.read_excel("./一个sheet存在多个表格.xlsx",header=None)
-# df.dropna(how="all", inplace=True)  # 删除全空行
-# df.dropna(axis=1, how="all", inplace=True)
-# df.reset_index(drop=True, inplace=True)
-# my_dict = json.loads(df.to_json(force_ascii=False, orient="index"))
-# chunks = [[0, 8],
-# [9, 17],
-# [18, 26],
-# [27, 35],
-# [36, 44],
-# [45, 53],
-# [54, 62],
-# [63, 71],
-# [72, 90]]
-#
-# if __name__ == "__main__":
-#
-#     SYSTEM_1 = Config().depart_system
-#     SYSTEM_2 = Config().prompt
-#     message = [
-#                 {"role": "system", "content": SYSTEM_1},
-#                 {"role": "user", "content": "你好"}]
-#     print(count_token(message))
-#
-#     message = [
-#                 {"role": "system", "content": SYSTEM_2},
-#                 {"role": "user", "content": "你好"}]
-#     print(count_token(message))
-
-
-
 
