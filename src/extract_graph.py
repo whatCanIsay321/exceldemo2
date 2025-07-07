@@ -1,11 +1,6 @@
 import json
-import time
 import asyncio
-from typing import Literal
-from sys import exception
-from typing import Annotated
-from pydantic import BaseModel, Field
-from src.utils import  extract_json,get_window,get_type_two_window,get_parse_window,extract_json_list,build_messages
+from src.utils import extract_json,get_window,get_type_two_window,get_parse_window,extract_json_list,build_messages
 from langgraph.graph import StateGraph, MessagesState, START, END
 from typing import TypedDict, Any
 from langgraph.types import Command
@@ -16,11 +11,8 @@ import pandas as pd
 import aiofiles
 from src.extract_item import item
 from src.prompt_manager import PromptManager
-import openpyxl
-from modelscope import AutoModelForCausalLM, AutoTokenizer
 
 class State(TypedDict):
-    type_window:int
     llm_window:int
 
     excel_df:Any
@@ -78,7 +70,7 @@ class FineTypeNode:
             final_messages = build_messages(self.final_system_prompt,user_prompt,dict(excel_list))
             token_num = TokenizerSingleton().get_token_num(final_messages)
 
-            if result_type == 1:
+            if type_result_type == 1:
                 if token_num > llm_window:
                     return Command(update={"excel_type": type_result_type, "flag": "通过函数"},
                                    goto="TypeOneGetHeadBot")
@@ -107,10 +99,9 @@ class TypeOneGetHeadNode:
     async def __call__(self, state: State):
         head_index = 30
         llm_window = state["llm_window"]
-        excel_list = state["excel_list"]
-        excel_dict=dict(excel_list[:head_index])
+        excel_list = state["excel_list"][:head_index]
         user_prompt = "JSON格式的Excel表格："
-        flag, messages = get_window(excel_dict, llm_window, self.system_prompt, user_prompt)
+        flag, messages = get_window(excel_list, llm_window, self.system_prompt, user_prompt)
         try:
             response =await OpenAIClientSingleton().create_completion(messages=messages)
             result = response.choices[0].message.content
@@ -126,10 +117,9 @@ class TypeOneGetIndexNode:
     async def __call__(self, state: State):
         head_index = 30
         llm_window = state["llm_window"]
-        excel_list = state["excel_list"]
-        excel_dict = dict(excel_list[:head_index])
+        excel_list = state["excel_list"][:head_index]
         user_prompt = "JSON格式的Excel表格："
-        flag, message = get_window(excel_dict, llm_window, self.system_prompt, user_prompt)
+        flag, message = get_window(excel_list, llm_window, self.system_prompt, user_prompt)
         try:
             response = await OpenAIClientSingleton().create_completion(messages=message)
             result = response.choices[0].message.content
@@ -144,13 +134,15 @@ class TypeOneGetCommonNode:
 
     async def __call__(self, state: State):
         llm_window = state["llm_window"]
-        excel_list = state["excel_list"]
-        head_index=int(state["type_one_head"]["index"])
-        excel_dict = dict(excel_list[:head_index+1])
+        head_index = int(state["type_one_head"]["index"])
+        excel_list = state["excel_list"][:head_index+1]
+
+
         user_prompt = "JSON格式的Excel表格："
-        flag, message = get_window(excel_dict, llm_window, self.system_prompt, user_prompt)
+        messages = build_messages(self.system_prompt, user_prompt,dict(excel_list))
+
         try:
-            response = await OpenAIClientSingleton().create_completion(messages=message)
+            response = await OpenAIClientSingleton().create_completion(messages=messages)
             result = response.choices[0].message.content
             result_json = extract_json(result)
             return Command(update={"type_one_common": result_json}, goto="TypeOneExeBot")
@@ -174,15 +166,27 @@ class TypeOneExeNode:
                      for key, value in index.items()
                  }
                  temp = self.merge_dicts(temp,common)
-                 if temp["generation_account"]!=None or temp["transaction_id"]!=None:
-                    if i ==0:
-                        count=self.count_non_empty_fields(temp)
-                        result.append(temp)
-                    else:
-                        if self.count_non_empty_fields(temp)>=count:
-                            result.append(temp)
-                        else:
-                            continue
+                 fields = PromptManager().get_primary_items()
+
+                 if any(temp.get(field) is not None for field in fields):
+                     if i == 0:
+                         count = self.count_non_empty_fields(temp)
+                         result.append(temp)
+                     else:
+                         if self.count_non_empty_fields(temp) >= count:
+                             result.append(temp)
+                         else:
+                             continue
+
+                 # if temp["generation_account"]!=None or temp["transaction_id"]!=None:
+                 #    if i ==0:
+                 #        count=self.count_non_empty_fields(temp)
+                 #        result.append(temp)
+                 #    else:
+                 #        if self.count_non_empty_fields(temp)>=count:
+                 #            result.append(temp)
+                 #        else:
+                 #            continue
              return Command(update={"result":result},goto=END)
          except Exception as e:
                 exception_message = str(e)
@@ -302,14 +306,14 @@ class TypeTwoExeNode():
     async def __call__(self, state: State):
         json_list=[]
         type_two_exe_prompt=state["type_two_exe_prompts"]
+        tasks=[]
         try:
             for messages in type_two_exe_prompt:
-                response =await OpenAIClientSingleton().create_completion(messages=messages[1])
-                result = response.choices[0].message.content
-                result_json = extract_json_list(result)
-                json_list.extend(result_json)
-
-
+                task = asyncio.create_task(OpenAIClientSingleton().create_completion(messages=messages[1]))
+                tasks.append(task)
+            task_reuslt = await asyncio.gather(*tasks)
+            result = [response.choices[0].message.content for response in task_reuslt]
+            json_list = [item for i in result for item in extract_json_list(i)]
             return Command(update={"result": json_list}, goto=END)
         except Exception as e:
             exception_message = str(e)
@@ -330,6 +334,8 @@ class OnlyllmNode:
         user_prompt = f"Json格式的Excel表格："
         messages = build_messages(self.system_prompt, user_prompt,excel_dict)
         try:
+            # loop = asyncio.get_running_loop()
+            # print(f"[create_item] gather即将运行在 loop id: {id(loop)}")
             response =await OpenAIClientSingleton().create_completion(messages=messages)
             result = response.choices[0].message.content
             result_json = extract_json_list(result)
@@ -388,23 +394,24 @@ class BuildGraph:
 
 if __name__ == "__main__":
     config = Config()
+    ex_item = item()
     # tokenizer = TokenizerSingleton().get_tokenizer()
     # num1 = len(tokenizer(config.depart_system)["input_ids"])
     # num2 =len(tokenizer(config.prompt)["input_ids"])
-    render_parameters = item().render_parameters
+    render_parameters = ex_item.render_parameters
     for key, value in config.model_dump().items():
         PromptManager().register_base(key,value)
         if key in render_parameters:
             PromptManager().render_base(key,**render_parameters.get(key))
         else:
             PromptManager().render_base(key)
-    excel_data = pd.read_excel("../excel/3个sheet都是有效数据？？20250106081920405.xls", header=None, sheet_name=None)
+    PromptManager().set_primary_items(ex_item.primary_item)
+    excel_data = pd.read_excel("../excel/4分钟.xlsx", header=None, sheet_name=None)
     excel_df=  [df for sheet_name, df in excel_data.items()]
-    df = excel_df[2]
+    df = excel_df[0]
     graph = BuildGraph().get_graph()
     async def get_item():
         result = await graph.ainvoke(input={
-            "type_window": 11000,
             "llm_window": 6000,
             "excel_df":df,
             "excel_dict": None,

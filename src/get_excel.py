@@ -1,8 +1,6 @@
 import pandas as pd
-import os
 import aiohttp
 from io import BytesIO
-import  asyncio
 async def get_excel_data(excel_url,timeout=30):
     try:
         async with aiohttp.ClientSession() as session:

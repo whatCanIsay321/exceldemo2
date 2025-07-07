@@ -14,15 +14,16 @@ from src.my_logger import logger
 from src.extract_item import item
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-
     config = Config()
-    render_parameters = item().render_parameters
+    ex_item = item()
+    render_parameters = ex_item.render_parameters
     for key, value in config.model_dump().items():
-        PromptManager().register_base(key,value)
+        PromptManager().register_base(key, value)
         if key in render_parameters:
-            PromptManager().render_base(key,**render_parameters.get(key))
+            PromptManager().render_base(key, **render_parameters.get(key))
         else:
             PromptManager().render_base(key)
+    PromptManager().set_primary_items(ex_item.primary_item)
 
     app.state.graph = BuildGraph().get_graph()
     logger.info("graph start")
@@ -50,7 +51,6 @@ async def create_item(item: Item,graph=Depends(get_graph)):
     else:
         for excel in excels:
             task = asyncio.create_task(graph.ainvoke({
-                "type_window": 11000,
                 "llm_window": 7000,
                 "excel_df":excel,
                 "excel_dict": None,
@@ -63,6 +63,8 @@ async def create_item(item: Item,graph=Depends(get_graph)):
                 'result':  None,
                 "error":None}))
             tasks.append(task)
+        # loop = asyncio.get_running_loop()
+        # logger.info(f"[create_item] gather即将运行在 loop id: {id(loop)}")
         reuslt = await asyncio.gather(*tasks)
         parse=[]
         output_filename = "merged_output.json"
@@ -72,9 +74,9 @@ async def create_item(item: Item,graph=Depends(get_graph)):
                 logger.info(f"{url}-第{index+1}张表-被分为{item["excel_type"]}类，通过{item["flag"]}提取出{len(item["result"])}")
             else:
                 logger.error(f"{url}-第{index+1}张表-被分为{item["excel_type"]}类，通过{item["flag"]}提取失败。失败原因{item["error"]}")
-        async with aiofiles.open(output_filename, 'w', encoding="utf-8") as f:
-            # 将list数据转换为JSON并写入文件
-            await f.write(json.dumps(parse, ensure_ascii=False, indent=4))
+        # async with aiofiles.open(output_filename, 'w', encoding="utf-8") as f:
+        #     # 将list数据转换为JSON并写入文件
+        #     await f.write(json.dumps(parse, ensure_ascii=False, indent=4))
         return {"parse":parse}
 
 
@@ -83,4 +85,20 @@ async def create_item(item: Item,graph=Depends(get_graph)):
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True,workers=4)
+    # import sys
+    # import os
+    # for path in sys.path:
+    #     print(path)
+
+    # print('1111111111111111111111111111111111111111')
+    # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    # for path in sys.path:
+    #     print(path)
+    # print("Current workspace folder:", os.environ.get('PYTHONPATH'))
+
+    # gunicorn main: app - k uvicorn.workers.UvicornWorker - w -b 127.0.0.1:8000
+
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+
+
+

@@ -1,6 +1,4 @@
 from jinja2 import Template
-from typing import Dict
-from config import  Config
 class PromptManager:
     _instance = None
     def __new__(cls):
@@ -10,6 +8,13 @@ class PromptManager:
             cls._instance.prompts={}
 
         return cls._instance
+    def get_primary_items(self):
+
+        return self.primary_items
+
+    def set_primary_items(self,items:list):
+
+        self.primary_items= items
 
     def register_base(self, name: str, template: str):
         """注册一个 prompt 模板"""

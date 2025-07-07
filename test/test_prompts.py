@@ -14,8 +14,3 @@
 #         PromptManager().render_base(key,**render_parameters.get(key))
 #     else:
 #         PromptManager().render_base()
-x ={"1":[3,2,3],"2":[3,2,3]}
-z = list(x.items())
-print(z)
-y = dict(z)
-print(y)
