@@ -84,20 +84,7 @@ async def create_item(item: Item,graph=Depends(get_graph)):
 
 
 if __name__ == "__main__":
-    # import sys
-    # import os
-    # for path in sys.path:
-    #     print(path)
-
-    # print('1111111111111111111111111111111111111111')
-    # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-    # for path in sys.path:
-    #     print(path)
-    # print("Current workspace folder:", os.environ.get('PYTHONPATH'))
-
-    # gunicorn main: app - k uvicorn.workers.UvicornWorker - w -b 127.0.0.1:8000
-
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000)
 
 
 

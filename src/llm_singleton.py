@@ -17,6 +17,7 @@ class OpenAIClientSingleton:
             messages=messages,
             stream=False,
             temperature=0.0,
+
         )
         return response
 

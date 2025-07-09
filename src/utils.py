@@ -3,7 +3,36 @@ import json
 from src.config import Config
 from src.token_singleton import TokenizerSingleton
 import pandas as pd
+from datetime import datetime
+import jionlp
+def date_format(date_str):
+    date_str=str(date_str)
+    flag = is_valid_yyyymm(date_str)
+    if flag:
+        return date_str,date_str
+    else:
+        try :
+            date_time =  jionlp.parse_time(date_str)
+            if len(date_time.get('time'))>0:
+                start_dt = datetime.strptime(date_time.get('time')[0], '%Y-%m-%d %H:%M:%S')
+                start_yyyymm = start_dt.strftime('%Y%m')
+                end_dt = datetime.strptime(date_time.get('time')[1], '%Y-%m-%d %H:%M:%S')
+                end_yyyymm = end_dt.strftime('%Y%m')
+                return start_yyyymm,end_yyyymm
+            else:
+                return date_str,date_str
+        except Exception as e:
+            return date_str,date_str
 
+
+
+
+def is_valid_yyyymm(s):
+    try:
+        datetime.strptime(str(s), '%Y%m')
+        return True
+    except ValueError:
+        return False
 def build_messages(system_prompt,user_prompt,input):
     input = json.dumps(input, separators=(",", ":"),ensure_ascii=False,indent=1)
     return [ {"role": "system", "content": system_prompt},

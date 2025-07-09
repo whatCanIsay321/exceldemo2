@@ -1,6 +1,11 @@
 import json
 import asyncio
-from src.utils import extract_json,get_window,get_type_two_window,get_parse_window,extract_json_list,build_messages
+
+from datetime import datetime
+
+import jionlp as jio
+
+from src.utils import *
 from langgraph.graph import StateGraph, MessagesState, START, END
 from typing import TypedDict, Any
 from langgraph.types import Command
@@ -93,9 +98,9 @@ class FineTypeNode:
 
             except Exception as e:
                 exception_message = str(e)
-                return Command(update={"error": f"FineTypeNode出错：{exception_message}"}, goto=END)
+                return Command(update={"error": f"FineTypeNode出错：{exception_message}"}, goto='FinshBot')
         else:
-            return Command(update={"excel_type": 1,"result": []}, goto=END)
+            return Command(update={"excel_type": 1,"result": []}, goto='FinshBot')
 
 class TypeOneGetHeadNode:
     def __init__(self, system_prompt):
@@ -114,7 +119,7 @@ class TypeOneGetHeadNode:
             return Command(update={"type_one_head": result_json}, goto="TypeOneGetIndexBot")
         except Exception as e:
             exception_message = str(e)
-            return Command(update={"error": f"TypeOneGetHeadNode出错：{exception_message}"}, goto=END)
+            return Command(update={"error": f"TypeOneGetHeadNode出错：{exception_message}"}, goto='FinshBot')
 class TypeOneGetIndexNode:
     def __init__(self, system_prompt):
         self.system_prompt = system_prompt
@@ -132,7 +137,7 @@ class TypeOneGetIndexNode:
             return Command(update={"type_one_index": result_json}, goto="TypeOneGetCommonBot")
         except Exception as e:
             exception_message = str(e)
-            return Command(update={"error": f"TypeOneGetIndexNode出错：{exception_message}"}, goto=END)
+            return Command(update={"error": f"TypeOneGetIndexNode出错：{exception_message}"}, goto='FinshBot')
 class TypeOneGetCommonNode:
     def __init__(self, system_prompt):
         self.system_prompt = system_prompt
@@ -153,7 +158,7 @@ class TypeOneGetCommonNode:
             return Command(update={"type_one_common": result_json}, goto="TypeOneExeBot")
         except Exception as e:
             exception_message = str(e)
-            return Command(update={"error": f"TypeOneGetCommonNode出错：{exception_message}"}, goto=END)
+            return Command(update={"error": f"TypeOneGetCommonNode出错：{exception_message}"}, goto='FinshBot')
 
 
 class TypeOneExeNode:
@@ -164,13 +169,35 @@ class TypeOneExeNode:
          common = state["type_one_common"]
          start_row = int(state["type_one_head"]["index"])
          excel_list = list(state["excel_dict"].values())[start_row+1:]
+         flag = False
          try:
              for i,data in enumerate(excel_list):
-                 flag=False
+                 start_from_start = None
+                 end_from_start = None
+                 start_from_end = None
+                 end_from_end = None
                  temp = {
                      key: data.get(str(value)) if value is not None else None
                      for key, value in index.items()
                  }
+                 start_time_str = temp.get('start_time')
+                 end_time_str = temp.get('end_time')
+                 if start_time_str:
+                    start_from_start,end_from_start = date_format(start_time_str)
+                 if end_time_str:
+                    start_from_end,end_from_end = date_format(end_time_str)
+
+
+                 if start_from_start :
+                     temp['start_time']=start_from_start
+                 elif start_from_end:
+                     temp['start_time'] = start_from_end
+                 if end_from_end:
+                     temp['end_time'] = end_from_end
+                 elif end_from_start:
+                     temp['end_time'] = end_from_start
+
+
                  temp = self.merge_dicts(temp,common)
                  fields = PromptManager().get_primary_items()
 
@@ -179,29 +206,20 @@ class TypeOneExeNode:
 
                      if flag == False:
                          count = self.count_non_empty_fields(temp)
+                         flag=True
                          result.append(temp)
-
                      else:
                          #对字段做是数字验证。
-
                          if self.count_non_empty_fields(temp) >= count:
                              result.append(temp)
                          else:
                              continue
 
-                 # if temp["generation_account"]!=None or temp["transaction_id"]!=None:
-                 #    if i ==0:
-                 #        count=self.count_non_empty_fields(temp)
-                 #        result.append(temp)
-                 #    else:
-                 #        if self.count_non_empty_fields(temp)>=count:
-                 #            result.append(temp)
-                 #        else:
-                 #            continue
-             return Command(update={"result":result},goto=END)
+
+             return Command(update={"result":result},goto='FinshBot')
          except Exception as e:
                 exception_message = str(e)
-                return Command(update={"error": f"TypeOneExeNode出错：{exception_message}"}, goto=END)
+                return Command(update={"error": f"TypeOneExeNode出错：{exception_message}"}, goto='FinshBot')
 
      def merge_dicts(self,dict1,dict2):  #
          for key, value in dict2.items():  # 遍历第二个字典
@@ -297,7 +315,7 @@ class TypeTwoGetChunksNode:
                             break
                 except Exception as e:
                     exception_message = str(e)
-                    return Command(update={"error": f"TypeTwoGetChunksNode出错：{exception_message}"}, goto=END)
+                    return Command(update={"error": f"TypeTwoGetChunksNode出错：{exception_message}"}, goto='FinshBot')
         return Command(update={"chunks": chunks}, goto="TypeTwoGetPromptsBot")
 
 
@@ -332,13 +350,13 @@ class TypeTwoExeNode():
                 json_errors.extend(errors)
             if True in json_errors:
                 exception_message = "发生了json缺失"
-                return Command(update={"result": json_list,"error": f"TypeTwoExeNode出错：{exception_message}"}, goto=END)
+                return Command(update={"result": json_list,"error": f"TypeTwoExeNode出错：{exception_message}"}, goto='FinshBot')
             else:
                 return Command(update={"result": json_list},
-                               goto=END)
+                               goto='FinshBot')
         except Exception as e:
             exception_message = str(e)
-            return Command(update={"error": f"TypeTwoExeNode出错：{exception_message}"}, goto=END)
+            return Command(update={"error": f"TypeTwoExeNode出错：{exception_message}"}, goto='FinshBot')
 
 
 
@@ -364,14 +382,18 @@ class OnlyllmNode:
             if error == True:
                 exception_message = "发生了json缺失"
                 return Command(update={"result": json_list, "error": f"TypeTwoExeNode出错：{exception_message}"},
-                               goto=END)
+                               goto='FinshBot')
             else:
                 return Command(update={"result": json_list},
-                               goto=END)
-            return Command(update={"result":result_json},goto=END)
+                               goto='FinshBot')
+
         except Exception as e:
             exception_message = str(e)
-            return Command(update={"error": f"OnlyllmNode出错：{exception_message}"}, goto=END)
+            return Command(update={"error": f"OnlyllmNode出错：{exception_message}"}, goto='FinshBot')
+
+class FinishNode:
+    async  def __call__(self, state: State):
+        return
 
 
 
@@ -396,7 +418,7 @@ class BuildGraph:
         ##################
         OnlyllmBot = OnlyllmNode(PromptManager().get("prompt"))
         ##################
-
+        FinshBot =FinishNode()
 
         ##################
         graph_builder.add_node("PreProcessBot", PreProcessBot)
@@ -409,7 +431,10 @@ class BuildGraph:
         graph_builder.add_node("TypeTwoGetPromptsBot", TypeTwoGetPromptsBot)
         graph_builder.add_node("TypeTwoExeBot", TypeTwoExeBot)
         graph_builder.add_node("OnlyllmBot", OnlyllmBot)
+        graph_builder.add_node("FinshBot", FinshBot)
         graph_builder.add_edge(START, "PreProcessBot")
+        graph_builder.add_edge("FinshBot", END)
+
         ##################
 
         graph = graph_builder.compile()
@@ -434,9 +459,9 @@ if __name__ == "__main__":
         else:
             PromptManager().render_base(key)
     PromptManager().set_primary_items(ex_item.primary_item)
-    excel_data = pd.read_excel("../excel/254E7A6C359A451E8E4F90A7A38F9532_67c6ac87e4b0e5530b926592.xlsx", header=None, sheet_name=None)
+    excel_data = pd.read_excel("../excel/4分钟.xlsx", header=None, sheet_name=None)
     excel_df=  [df for sheet_name, df in excel_data.items()]
-    df = excel_df[2]
+    df = excel_df[0]
     graph = BuildGraph().get_graph()
     async def get_item():
         result = await graph.ainvoke(input={
