@@ -67,7 +67,6 @@ async def create_item(item: Item,graph=Depends(get_graph)):
         # logger.info(f"[create_item] gather即将运行在 loop id: {id(loop)}")
         reuslt = await asyncio.gather(*tasks)
         parse=[]
-        output_filename = "merged_output.json"
         for index,item in enumerate(reuslt):
             if item["error"]==None:
                 parse.extend(item["result"])

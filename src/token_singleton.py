@@ -6,7 +6,8 @@ class TokenizerSingleton:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             # local_files_only = True
-            cls._instance.tokenizer = AutoTokenizer.from_pretrained(url,cache_dir="tokenizer")
+
+            cls._instance.tokenizer = AutoTokenizer.from_pretrained(url,cache_dir="tokenizer",local_files_only=True)
             print("token单例被创建")
         return cls._instance
 

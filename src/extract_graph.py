@@ -52,45 +52,50 @@ class FineTypeNode:
     async def __call__(self, state: State):
         llm_window = state["llm_window"]
         excel_list = state["excel_list"]
-        user_prompt = f"Json格式的Excel表格："
-        type_flag,type_messages = get_window(excel_list,llm_window,self.type_system_prompt,user_prompt)
-        count_flag,count_messages = get_window(excel_list,llm_window,self.count_system_prompt,user_prompt)
+        if excel_list != []:
+            user_prompt = f"Json格式的Excel表格："
+            type_flag,type_messages = get_window(excel_list,llm_window,self.type_system_prompt,user_prompt)
+            count_flag,count_messages = get_window(excel_list,llm_window,self.count_system_prompt,user_prompt)
 
-        try:
-            type_response =await OpenAIClientSingleton().create_completion(messages=type_messages)
-            type_result = type_response.choices[0].message.content
-            type_result_json = extract_json(type_result)
-            type_result_type = int(type_result_json["type"])
+            try:
+                type_response =await OpenAIClientSingleton().create_completion(messages=type_messages)
+                type_result = type_response.choices[0].message.content
+                type_result_json = extract_json(type_result)
+                type_result_type = int(type_result_json["type"])
 
-            count_response = await OpenAIClientSingleton().create_completion(messages=count_messages)
-            count_result = count_response.choices[0].message.content
-            count_result_json = extract_json(count_result)
-            count_result_count = int(count_result_json["count"])
+                count_response = await OpenAIClientSingleton().create_completion(messages=count_messages)
+                count_result = count_response.choices[0].message.content
+                count_result_json = extract_json(count_result)
+                count_result_count = int(count_result_json["count"])
 
-            final_messages = build_messages(self.final_system_prompt,user_prompt,dict(excel_list))
-            token_num = TokenizerSingleton().get_token_num(final_messages)
+                final_messages = build_messages(self.final_system_prompt,user_prompt,dict(excel_list))
+                token_num = TokenizerSingleton().get_token_num(final_messages)
+                # return Command(update={"excel_type": type_result_type, "flag": "直接送入模型"},
+                #                goto="OnlyllmBot")
 
-            if type_result_type == 1:
-                if token_num > llm_window:
-                    return Command(update={"excel_type": type_result_type, "flag": "通过函数"},
-                                   goto="TypeOneGetHeadBot")
-                else:
-                    if count_result_count>10:
+                if type_result_type == 1:
+                    if token_num > llm_window:
                         return Command(update={"excel_type": type_result_type, "flag": "通过函数"},
                                        goto="TypeOneGetHeadBot")
                     else:
-                        return Command(update={"excel_type": type_result_type, "flag": "直接送入模型"},
-                                       goto="OnlyllmBot")
-            else:
-                if token_num > llm_window:
-                    return Command(update={"excel_type": type_result_type, "flag": "通过切片"},
-                                   goto="TypeTwoGetChunksBot")
+                        if count_result_count>10:
+                            return Command(update={"excel_type": type_result_type, "flag": "通过函数"},
+                                           goto="TypeOneGetHeadBot")
+                        else:
+                            return Command(update={"excel_type": type_result_type, "flag": "直接送入模型"},
+                                           goto="OnlyllmBot")
                 else:
-                    return Command(update={"excel_type": type_result_type, "flag": "直接送入模型"}, goto="OnlyllmBot")
+                    if token_num > llm_window:
+                        return Command(update={"excel_type": type_result_type, "flag": "通过切片"},
+                                       goto="TypeTwoGetChunksBot")
+                    else:
+                        return Command(update={"excel_type": type_result_type, "flag": "直接送入模型"}, goto="OnlyllmBot")
 
-        except Exception as e:
-            exception_message = str(e)
-            return Command(update={"error": f"FineTypeNode出错：{exception_message}"}, goto=END)
+            except Exception as e:
+                exception_message = str(e)
+                return Command(update={"error": f"FineTypeNode出错：{exception_message}"}, goto=END)
+        else:
+            return Command(update={"excel_type": 1,"result": []}, goto=END)
 
 class TypeOneGetHeadNode:
     def __init__(self, system_prompt):
@@ -161,6 +166,7 @@ class TypeOneExeNode:
          excel_list = list(state["excel_dict"].values())[start_row+1:]
          try:
              for i,data in enumerate(excel_list):
+                 flag=False
                  temp = {
                      key: data.get(str(value)) if value is not None else None
                      for key, value in index.items()
@@ -168,11 +174,16 @@ class TypeOneExeNode:
                  temp = self.merge_dicts(temp,common)
                  fields = PromptManager().get_primary_items()
 
-                 if any(temp.get(field) is not None for field in fields):
-                     if i == 0:
+                 if any(str(temp.get(field)).isdigit() for field in fields if temp.get(field) is not None):
+
+
+                     if flag == False:
                          count = self.count_non_empty_fields(temp)
                          result.append(temp)
+
                      else:
+                         #对字段做是数字验证。
+
                          if self.count_non_empty_fields(temp) >= count:
                              result.append(temp)
                          else:
@@ -194,7 +205,7 @@ class TypeOneExeNode:
 
      def merge_dicts(self,dict1,dict2):  #
          for key, value in dict2.items():  # 遍历第二个字典
-             if key in dict1:  # 如果第一个字典已有该键
+             if key in dict1 and  dict1[key]!=None:  # 如果第一个字典已有该键
                  if value!=None:  # 如果第一个字典的值是None
                      dict1[key] = value  # 用第二个字典的值替换
              else:
@@ -313,8 +324,18 @@ class TypeTwoExeNode():
                 tasks.append(task)
             task_reuslt = await asyncio.gather(*tasks)
             result = [response.choices[0].message.content for response in task_reuslt]
-            json_list = [item for i in result for item in extract_json_list(i)]
-            return Command(update={"result": json_list}, goto=END)
+            json_list = []
+            json_errors = []
+            for i in result:
+                items, errors = extract_json_list(i)  # 假设返回值是 (List[item], List[error])
+                json_list.extend(items)
+                json_errors.extend(errors)
+            if True in json_errors:
+                exception_message = "发生了json缺失"
+                return Command(update={"result": json_list,"error": f"TypeTwoExeNode出错：{exception_message}"}, goto=END)
+            else:
+                return Command(update={"result": json_list},
+                               goto=END)
         except Exception as e:
             exception_message = str(e)
             return Command(update={"error": f"TypeTwoExeNode出错：{exception_message}"}, goto=END)
@@ -336,10 +357,17 @@ class OnlyllmNode:
         try:
             # loop = asyncio.get_running_loop()
             # print(f"[create_item] gather即将运行在 loop id: {id(loop)}")
+
             response =await OpenAIClientSingleton().create_completion(messages=messages)
             result = response.choices[0].message.content
-            result_json = extract_json_list(result)
-
+            json_list,error = extract_json_list(result)
+            if error == True:
+                exception_message = "发生了json缺失"
+                return Command(update={"result": json_list, "error": f"TypeTwoExeNode出错：{exception_message}"},
+                               goto=END)
+            else:
+                return Command(update={"result": json_list},
+                               goto=END)
             return Command(update={"result":result_json},goto=END)
         except Exception as e:
             exception_message = str(e)
@@ -406,9 +434,9 @@ if __name__ == "__main__":
         else:
             PromptManager().render_base(key)
     PromptManager().set_primary_items(ex_item.primary_item)
-    excel_data = pd.read_excel("../excel/4分钟.xlsx", header=None, sheet_name=None)
+    excel_data = pd.read_excel("../excel/254E7A6C359A451E8E4F90A7A38F9532_67c6ac87e4b0e5530b926592.xlsx", header=None, sheet_name=None)
     excel_df=  [df for sheet_name, df in excel_data.items()]
-    df = excel_df[0]
+    df = excel_df[2]
     graph = BuildGraph().get_graph()
     async def get_item():
         result = await graph.ainvoke(input={
