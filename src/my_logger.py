@@ -1,6 +1,7 @@
 import os
 import logging
 from concurrent_log_handler import ConcurrentRotatingFileHandler
+from logging.handlers import RotatingFileHandler
 
 # 创建日志目录
 
@@ -31,5 +32,4 @@ if not logger.handlers:
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
 
-    # 测试输出
-    # logger.debug('这是 debug 日志')
+

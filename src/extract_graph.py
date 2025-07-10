@@ -1,10 +1,6 @@
 import json
 import asyncio
-
 from datetime import datetime
-
-import jionlp as jio
-
 from src.utils import *
 from langgraph.graph import StateGraph, MessagesState, START, END
 from typing import TypedDict, Any
@@ -34,7 +30,8 @@ class State(TypedDict):
     chunks:Any
     result:list | None
 
-    error:str
+    error:str | None
+    json_lost:int
 
 
 class PreProcessNode:
@@ -147,7 +144,6 @@ class TypeOneGetCommonNode:
         head_index = int(state["type_one_head"]["index"])
         excel_list = state["excel_list"][:head_index+1]
 
-
         user_prompt = "JSON格式的Excel表格："
         messages = build_messages(self.system_prompt, user_prompt,dict(excel_list))
 
@@ -186,8 +182,6 @@ class TypeOneExeNode:
                     start_from_start,end_from_start = date_format(start_time_str)
                  if end_time_str:
                     start_from_end,end_from_end = date_format(end_time_str)
-
-
                  if start_from_start :
                      temp['start_time']=start_from_start
                  elif start_from_end:
@@ -196,14 +190,17 @@ class TypeOneExeNode:
                      temp['end_time'] = end_from_end
                  elif end_from_start:
                      temp['end_time'] = end_from_start
+                 total = temp.get('total_electricity')
+                 grid = temp.get('grid_electricity')
 
+                 if total is None and grid is not None:
+                     temp['total_electricity'] = grid
+                 elif grid is None and total is not None:
+                     temp['grid_electricity'] = total
 
                  temp = self.merge_dicts(temp,common)
                  fields = PromptManager().get_primary_items()
-
                  if any(str(temp.get(field)).isdigit() for field in fields if temp.get(field) is not None):
-
-
                      if flag == False:
                          count = self.count_non_empty_fields(temp)
                          flag=True
@@ -214,8 +211,6 @@ class TypeOneExeNode:
                              result.append(temp)
                          else:
                              continue
-
-
              return Command(update={"result":result},goto='FinshBot')
          except Exception as e:
                 exception_message = str(e)
@@ -334,6 +329,7 @@ class TypeTwoGetPromptsNode:
 class TypeTwoExeNode():
     async def __call__(self, state: State):
         json_list=[]
+        json_lost=0
         type_two_exe_prompt=state["type_two_exe_prompts"]
         tasks=[]
         try:
@@ -348,9 +344,10 @@ class TypeTwoExeNode():
                 items, errors = extract_json_list(i)  # 假设返回值是 (List[item], List[error])
                 json_list.extend(items)
                 json_errors.extend(errors)
+            json_lost = sum(lst)
             if True in json_errors:
                 exception_message = "发生了json缺失"
-                return Command(update={"result": json_list,"error": f"TypeTwoExeNode出错：{exception_message}"}, goto='FinshBot')
+                return Command(update={"result": json_list,"error": f"TypeTwoExeNode出错：{exception_message}","json_lost":json_lost}, goto='FinshBot')
             else:
                 return Command(update={"result": json_list},
                                goto='FinshBot')
@@ -459,7 +456,7 @@ if __name__ == "__main__":
         else:
             PromptManager().render_base(key)
     PromptManager().set_primary_items(ex_item.primary_item)
-    excel_data = pd.read_excel("../excel/4分钟.xlsx", header=None, sheet_name=None)
+    excel_data = pd.read_excel("../excel/4AEE2E04146D4F5885025C41E513E681_67b81706e4b07d3d4d6b4ee0.xls", header=None, sheet_name=None)
     excel_df=  [df for sheet_name, df in excel_data.items()]
     df = excel_df[0]
     graph = BuildGraph().get_graph()
@@ -477,6 +474,8 @@ if __name__ == "__main__":
             'type_two_exe_prompts': None,
             'chunks':  None,
             'result':  None,
+            "error":None,
+            'json_lost':0,
         })  # 调用异步函数并等待结果
         print(f"获取的结果是: {result}")
         x = result["result"]
