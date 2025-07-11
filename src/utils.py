@@ -60,11 +60,9 @@ def build_messages(system_prompt,user_prompt,input):
 
 
 def extract_json(input_str):
+    matches = re.findall(r'\{.*?\}', input_str, re.DOTALL)
+    return json.loads(matches[0])
 
-    json_str =re.search(r'(\{.*\})', input_str, re.DOTALL).group(1)
-    json_str = json.loads(json_str)
-    # 使用正则表达式提取 JSON 字符串（以 ```json 开头，``` 结束）
-    return json_str
 
 def extract_json_list(text):
     tail = text[-10:]

@@ -46,19 +46,19 @@ class item(BaseModel):
 
 ## power_company
 - 描述：售电单位,结算单中的售电方企业名称。
-- 匹配关键词：户号、发电客户名称、户名、项目名称。
+- 匹配关键词：发电客户名称、户名、项目名称。
 - 值类型：一般叫某某公司。
 
 ## generation_account:
 - 描述: 发电方的编号，表示本单位或本项目作为发电客户在电力系统中的身份标识。通常由系统统一分配，用于电费结算中标识发电方。
-- 匹配关键词:发电户编号、 发电户号、发电客户编码、用户编号、项目编号、发电客户号、客户编号
-- **排除关键词**:电厂（交易对象）编号、电厂交易号、电厂号、交易对象编号、上网户号、并网户号、购电户号、购电号、电厂编号
+- 匹配关键词:**户号**（完全匹配字段）、发电户编号、 发电户号、发电客户编码、用户编号、项目编号、发电客户号、客户编号
+- **排除关键词**:用电户号、电厂（交易对象）编号、电厂交易号、电厂号、交易对象编号、上网户号、并网户号、购电户号、购电号、电厂编号
 - 值类型: 字符串（即使是纯数字也应保留前导零）
 
 ## transaction_id:
 - 描述: 电费结算中的交易对方编号，通常表示购电方、上网电厂、并网用户等身份。该编号标识的是电力市场中的交易对象，而非本单位。
 - 匹配关键词:电厂（交易对象）编号、电厂交易号、电厂号、交易对象编号、上网户号、并网户号、购电户号、购电号、电厂编号
-- **排除关键词**:发电户编号、 发电户号、发电客户编码、用户编号、项目编号、发电客户号、客户编号
+- **排除关键词**:用电户号、发电户编号、 发电户号、发电客户编码、用户编号、项目编号、发电客户号、客户编号
 - 值类型: 字符串（即使是纯数字也应保留前导零）
 
 ## meter_id
@@ -109,19 +109,19 @@ class item(BaseModel):
 
 ## power_company
 - 描述：售电单位,结算单中的售电方企业名称。
-- 匹配关键词：户号、发电客户名称、户名、项目名称。
+- 匹配关键词：发电客户名称、户名、项目名称。
 - 值类型：一般叫某某公司。
 
 ## generation_account:
 - 描述: 发电方的编号，表示本单位或本项目作为发电客户在电力系统中的身份标识。通常由系统统一分配，用于电费结算中标识发电方。
-- 匹配关键词:发电户编号、 发电户号、发电客户编码、用户编号、项目编号、发电客户号、客户编号
-- **排除关键词**:电厂（交易对象）编号、电厂交易号、电厂号、交易对象编号、上网户号、并网户号、购电户号、购电号、电厂编号
+- 匹配关键词:**户号**（完全匹配字段）、发电户编号、 发电户号、发电客户编码、用户编号、项目编号、发电客户号、客户编号
+- **排除关键词**:用电户号、电厂（交易对象）编号、电厂交易号、电厂号、交易对象编号、上网户号、并网户号、购电户号、购电号、电厂编号
 - 值类型: 字符串（即使是纯数字也应保留前导零）
 
 ## transaction_id:
 - 描述: 电费结算中的交易对方编号，通常表示购电方、上网电厂、并网用户等身份。该编号标识的是电力市场中的交易对象，而非本单位。
 - 匹配关键词:电厂（交易对象）编号、电厂交易号、电厂号、交易对象编号、上网户号、并网户号、购电户号、购电号、电厂编号
-- **排除关键词**:发电户编号、 发电户号、发电客户编码、用户编号、项目编号、发电客户号、客户编号
+- **排除关键词**:用电户号、发电户编号、 发电户号、发电客户编码、用户编号、项目编号、发电客户号、客户编号
 - 值类型: 字符串（即使是纯数字也应保留前导零）
 
 ## meter_id
@@ -131,33 +131,33 @@ class item(BaseModel):
 
 
     output_get_index_system:str='''{
-  "start_time": None,
+  "start_time": null,
   "end_time": 0,
   "total_electricity": 1,
-  "grid_electricity": None,
+  "grid_electricity": null,
   "payable_fee": 17,
-  "payable_tax": None,
+  "payable_tax": null,
   "grid_price": 9,
-  "power_station": None,
-  "power_company":None,
+  "power_station": null,
+  "power_company":null,
   "generation_account": 3,
-  "transaction_id": None,
-  "meter_id": None
+  "transaction_id": null,
+  "meter_id": null
 }'''
 
     output_get_head_common_system:str='''{
   "start_time": 202503,
   "end_time": 202504,
-  "total_electricity": None,
-  "grid_electricity": None,
-  "payable_fee": None,
-  "payable_tax": None,
-  "grid_price": None,		
+  "total_electricity": null,
+  "grid_electricity": null,
+  "payable_fee": null,
+  "payable_tax": null,
+  "grid_price": null,		
   "power_station": "北京供电所",
   "power_company":乙方：合肥市长兵九能源有限公司,		
   "generation_account": 3550002017241,
-  "transaction_id": None,
-  "meter_id": None
+  "transaction_id": null,
+  "meter_id": null
 }'''
 
     output_prompt:str='''[
