@@ -7,14 +7,14 @@ WORKDIR /app
 
 COPY . .
 
+RUN python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-RUN pip install -i  https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 
-
+RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 
 EXPOSE 8000
 
 
-CMD ["gunicorn", "main:app", "-k", "uvicorn.workers.UvicornWorker", "-w", "4", "-b", "0.0.0.0:8000"]
+CMD ["python", "main.py"]
 

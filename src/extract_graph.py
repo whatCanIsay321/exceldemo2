@@ -16,6 +16,7 @@ from src.prompt_manager import PromptManager
 class State(TypedDict):
     llm_window:int
 
+    sheet_name:str
     excel_df:Any
     excel_dict:Any
     excel_list:Any
@@ -176,20 +177,7 @@ class TypeOneExeNode:
                      key: data.get(str(value)) if value is not None else None
                      for key, value in index.items()
                  }
-                 start_time_str = temp.get('start_time')
-                 end_time_str = temp.get('end_time')
-                 if start_time_str:
-                    start_from_start,end_from_start = date_format(start_time_str)
-                 if end_time_str:
-                    start_from_end,end_from_end = date_format(end_time_str)
-                 if start_from_start :
-                     temp['start_time']=start_from_start
-                 elif start_from_end:
-                     temp['start_time'] = start_from_end
-                 if end_from_end:
-                     temp['end_time'] = end_from_end
-                 elif end_from_start:
-                     temp['end_time'] = end_from_start
+
                  total = temp.get('total_electricity')
                  grid = temp.get('grid_electricity')
 
@@ -199,14 +187,39 @@ class TypeOneExeNode:
                      temp['grid_electricity'] = total
 
                  temp = self.merge_dicts(temp,common)
+
+                 try:
+                     temp["payable_fee"] = round(float(temp["payable_fee"]), 2) if temp["payable_fee"] is not None else None
+                 except Exception as er:
+                     pass
+                 start_time_str = temp.get('start_time')
+                 end_time_str = temp.get('end_time')
+
+                 if start_time_str:
+                     start_from_start, end_from_start = date_format(start_time_str)
+                 if end_time_str:
+                     start_from_end, end_from_end = date_format(end_time_str)
+                 if start_from_start:
+                     temp['start_time'] = start_from_start
+                 elif start_from_end:
+                     temp['start_time'] = start_from_end
+                 if end_from_end:
+                     temp['end_time'] = end_from_end
+                 elif end_from_start:
+                     temp['end_time'] = end_from_start
+
+                 if (val := timestamp_to_yyyymm(temp['start_time'])) is not None:
+                     temp['start_time'] = val
+                 if (val := timestamp_to_yyyymm(temp['end_time'])) is not None:
+                     temp['end_time'] = val
                  fields = PromptManager().get_primary_items()
                  if any(str(temp.get(field)).isdigit() for field in fields if temp.get(field) is not None):
                      if flag == False:
                          count = self.count_non_empty_fields(temp)
-                         flag=True
+                         flag = True
                          result.append(temp)
                      else:
-                         #对字段做是数字验证。
+                         # 对字段做是数字验证。
                          if self.count_non_empty_fields(temp) >= count:
                              result.append(temp)
                          else:
@@ -216,13 +229,13 @@ class TypeOneExeNode:
                 exception_message = str(e)
                 return Command(update={"error": f"TypeOneExeNode出错：{exception_message}"}, goto='FinshBot')
 
-     def merge_dicts(self,dict1,dict2):  #
-         for key, value in dict2.items():  # 遍历第二个字典
-             if key in dict1 and  dict1[key]!=None:  # 如果第一个字典已有该键
-                 if value!=None:  # 如果第一个字典的值是None
-                     dict1[key] = value  # 用第二个字典的值替换
+     def merge_dicts(self, dict1, dict2):
+         for key, value in dict2.items():
+             if key in dict1:
+                 if dict1[key] is None and value is not None:
+                     dict1[key] = value
              else:
-                 dict1[key] = value  # 如果第一个字典没有该键，直接添加
+                 dict1[key] = value
          return dict1
 
      def count_non_empty_fields(self,dict):
@@ -370,15 +383,12 @@ class OnlyllmNode:
         user_prompt = f"Json格式的Excel表格："
         messages = build_messages(self.system_prompt, user_prompt,excel_dict)
         try:
-            # loop = asyncio.get_running_loop()
-            # print(f"[create_item] gather即将运行在 loop id: {id(loop)}")
-
             response =await OpenAIClientSingleton().create_completion(messages=messages)
             result = response.choices[0].message.content
             json_list,error = extract_json_list(result)
             if error == True:
                 exception_message = "发生了json缺失"
-                return Command(update={"result": json_list, "error": f"TypeTwoExeNode出错：{exception_message}"},
+                return Command(update={"result": json_list, "error": f"TypeTwoExeNode出错：{exception_message}","json_lost":1},
                                goto='FinshBot')
             else:
                 return Command(update={"result": json_list},

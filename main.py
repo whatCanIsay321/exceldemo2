@@ -5,6 +5,7 @@ from src.config import Config
 from pydantic import BaseModel
 import json
 import aiofiles
+from fastapi import HTTPException
 from fastapi import FastAPI, Depends,Request
 import uvicorn
 from src.llm_singleton import OpenAIClientSingleton
@@ -35,7 +36,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-semaphore = asyncio.Semaphore(20)
+semaphore = asyncio.Semaphore(50)
 
 
 
@@ -59,7 +60,6 @@ async def create_item(item: Item,graph=Depends(get_graph)):
             total_parse=[]
             excels = []
             success=[]
-
             url_list = item.url_list
             for index , url in enumerate(url_list):
                 url = url.strip()
@@ -69,49 +69,55 @@ async def create_item(item: Item,graph=Depends(get_graph)):
                 else:
                     excels.append(excel)
             for excel in excels:
-                for sheet in excel:
-                    tasks = []
-                    parse = []
-                    flag = True
-                    task = asyncio.create_task(graph.ainvoke({
-                        "llm_window": 7000,
-                        "excel_df": sheet,
-                        "excel_dict": None,
-                        "excel_type": None,
-                        "flag": "",
-                        "type_one_head": None,
-                        "type_one_index": None,
-                        'type_two_exe_prompts': None,
-                        'chunks': None,
-                        'result': None,
-                        "error": None,
-                        'json_lost': 0,
-                    }))
-                    tasks.append(task)
+                tasks = []
+                parse = []
+                flag = True
+                for name,sheet in excel:
+                    if sheet.empty:
+                        logger.info(
+                            f"{BLUE}\n发现{url}中\n{name}张表是空表，跳过这张表{RESET}")
+                    else:
+                        task = asyncio.create_task(graph.ainvoke({
+                            "llm_window": 7000,
+                            'sheet_name':name,
+                            "excel_df": sheet,
+                            "excel_dict": None,
+                            "excel_type": None,
+                            "flag": "",
+                            "type_one_head": None,
+                            "type_one_index": None,
+                            'type_two_exe_prompts': None,
+                            'chunks': None,
+                            'result': None,
+                            "error": None,
+                            'json_lost': 0,
+                        }))
+
+                        tasks.append(task)
                 reuslt = await asyncio.gather(*tasks)
                 for index, item in enumerate(reuslt):
                     if item["error"] == None:
                         parse.extend(item["result"])
                         logger.info(
-                            f"{BLUE}\n正在解析{url}\n第{index + 1}张表\n被分为{item["excel_type"]}类\n,通过{item["flag"]}提取出{len(item["result"])}{RESET}")
+                            f"{BLUE}\n已经解析出{url}\n{item["sheet_name"]}\n这张表被分为{item["excel_type"]}类\n通过{item["flag"]}提取出{len(item["result"])}{RESET}")
                     else:
                         flag = False
                         if item["json_lost"] == 0:
                             logger.error(
-                                f"\n正在解析{url}\n第{index + 1}张表\n被分为{item["excel_type"]}类\n,通过{item["flag"]}提取失败。失败原因{item["error"]}{RESET}")
+                                f"\n尝试解析{url}\n{item["sheet_name"]}\n这张表被分为{item["excel_type"]}类\n通过{item["flag"]}提取失败。失败原因{item["error"]}{RESET}")
                         else:
                             logger.error(
-                                f"{YELLOW}\n正在解析{url}\n第{index + 1}张表\n被分为{item["excel_type"]}类\n,通过{item["flag"]}提取发生丢失。丢失原因原因{item["error"]}，提取出{len(item["result"])}{RESET}")
+                                f"{YELLOW}\n已经解析出{url}\n{item["sheet_name"]}\n被分为{item["excel_type"]}类\n通过{item["flag"]}提取发生丢失。丢失原因原因{item["error"]}，提取出{len(item["result"])}{RESET}")
                 if flag:
                     total_parse.extend(parse)
                     success.append(url)
                 logger.info(
-                    f"{CYAN}\n成功解析{url}\n一共{len(tasks)}张表\n,共提取出{len(parse)}{RESET}")
+                    f"{CYAN}\n成功解析{url}\n一共{len(tasks)}张表\n共提取出{len(parse)}{RESET}")
             logger.info(
-                f"{GREEN}成功解析{url_list}\n{success}\n,共提取出{len(total_parse)}{RESET}")
+                f"{GREEN}成功解析{url_list}中\n{success}\n共提取出{len(total_parse)}{RESET}")
             return {"parse": total_parse}
     else:
-        raise HTTPException(status_code=429, detail="Too many concurrent requests")
+        raise HTTPException(status_code=429, detail="服务器繁忙，请稍后再试")
 
 
 
@@ -122,7 +128,7 @@ async def create_item(item: Item,graph=Depends(get_graph)):
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000,reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000,reload=True)
 
 
 
