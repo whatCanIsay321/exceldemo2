@@ -2476,3 +2476,72 @@ Sheet1
 2025-07-11 12:02:10,092 - my_logger - INFO - [92m成功解析['https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250708/AD083C6245CA43A682C4E30819EA5BB1_686ccf42e4b0df2808c160fb.xlsx']中
 ['https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250708/AD083C6245CA43A682C4E30819EA5BB1_686ccf42e4b0df2808c160fb.xlsx']
 共提取出160[0m
+2025-07-18 16:00:34,370 - my_logger - INFO - graph start
+2025-07-18 16:02:36,138 - my_logger - INFO - [94m
+已经解析出https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250708/AD083C6245CA43A682C4E30819EA5BB1_686ccf42e4b0df2808c160fb.xlsx
+Sheet1
+这张表被分为1类
+通过通过函数提取出160[0m
+2025-07-18 16:02:36,138 - my_logger - INFO - [96m
+成功解析https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250708/AD083C6245CA43A682C4E30819EA5BB1_686ccf42e4b0df2808c160fb.xlsx
+一共1张表
+共提取出160[0m
+2025-07-18 16:02:36,140 - my_logger - INFO - [92m成功解析['https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250708/AD083C6245CA43A682C4E30819EA5BB1_686ccf42e4b0df2808c160fb.xlsx']中
+['https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250708/AD083C6245CA43A682C4E30819EA5BB1_686ccf42e4b0df2808c160fb.xlsx']
+共提取出160[0m
+2025-07-21 08:41:07,120 - my_logger - INFO - graph start
+2025-07-21 08:43:10,845 - my_logger - INFO - [94m
+发现https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx中
+Sheet7张表是空表，跳过这张表[0m
+2025-07-21 08:43:26,141 - my_logger - INFO - [94m
+已经解析出https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx
+Sheet1
+这张表被分为1类
+通过通过函数提取出32[0m
+2025-07-21 08:43:26,143 - my_logger - INFO - [96m
+成功解析https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx
+一共1张表
+共提取出32[0m
+2025-07-21 08:43:26,143 - my_logger - INFO - [94m
+发现https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx中
+Sheet7张表是空表，跳过这张表[0m
+2025-07-21 08:43:31,886 - my_logger - INFO - [94m
+已经解析出https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx
+Sheet1
+这张表被分为1类
+通过通过函数提取出32[0m
+2025-07-21 08:43:31,887 - my_logger - INFO - [96m
+成功解析https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx
+一共1张表
+共提取出32[0m
+2025-07-21 08:43:31,887 - my_logger - INFO - [92m成功解析['https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx', 'https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx']中
+['https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx', 'https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx']
+共提取出64[0m
+2025-07-21 08:44:22,534 - my_logger - INFO - graph start
+2025-07-21 08:44:25,981 - my_logger - INFO - [94m
+发现https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx中
+Sheet7张表是空表，跳过这张表[0m
+2025-07-21 08:44:32,951 - my_logger - INFO - [94m
+已经解析出https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx
+Sheet1
+这张表被分为1类
+通过通过函数提取出32[0m
+2025-07-21 08:44:32,952 - my_logger - INFO - [96m
+成功解析https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx
+一共1张表
+共提取出32[0m
+2025-07-21 08:44:32,954 - my_logger - INFO - [94m
+发现https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx中
+Sheet7张表是空表，跳过这张表[0m
+2025-07-21 08:44:38,680 - my_logger - INFO - [94m
+已经解析出https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx
+Sheet1
+这张表被分为1类
+通过通过函数提取出32[0m
+2025-07-21 08:44:38,682 - my_logger - INFO - [96m
+成功解析https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx
+一共1张表
+共提取出32[0m
+2025-07-21 08:44:38,683 - my_logger - INFO - [92m成功解析['https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx', 'https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx']中
+['https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx', 'https://csde-file.trinablue.com/prod/rsbu-mdm-contract-ps-api/20250317/48B19CA5E7B04F4CBCA2F24FB99D55AD_67d7b3d2e4b054f2346ccfe8.xlsx']
+共提取出64[0m

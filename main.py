@@ -38,13 +38,31 @@ app = FastAPI(lifespan=lifespan)
 
 semaphore = asyncio.Semaphore(50)
 
-
+class Item(BaseModel):
+    url_list: list
 
 def get_graph():
     return app.state.graph
 
-class Item(BaseModel):
-    url_list: list
+def mapping(source):
+    key_map = {
+        "start_time": "开始时间",
+        "end_time": "结束时间",
+        "total_electricity": "总用电量",
+        "grid_electricity": "上网电量",
+        "payable_fee": "应付电费",
+        "payable_tax": "应付税费",
+        "grid_price": "上网电价",
+        "power_station": "供电所",
+        "power_company": "售电公司",
+        "generation_account": "发电户号",
+        "transaction_id": "交易单号",
+        "meter_id": "电表编号"
+    }
+    return [
+            {key_map.get(k, k): v for k, v in item.items()}
+            for item in source
+        ]
 
 
 
@@ -115,6 +133,8 @@ async def create_item(item: Item,graph=Depends(get_graph)):
                     f"{CYAN}\n成功解析{url}\n一共{len(tasks)}张表\n共提取出{len(parse)}{RESET}")
             logger.info(
                 f"{GREEN}成功解析{url_list}中\n{success}\n共提取出{len(total_parse)}{RESET}")
+            if total_parse:
+                total_parse = mapping(total_parse)
             return {"parse": total_parse}
     else:
         raise HTTPException(status_code=429, detail="服务器繁忙，请稍后再试")
